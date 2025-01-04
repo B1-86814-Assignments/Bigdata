@@ -1,0 +1,379 @@
+1. Create a transactional ORC table "ﬁre_data" with appropriate data types partitioned by city and buckted by call number into 4 buckets. Load data from
+staging table into this table.
+
+create table fire_staging(
+callno int,
+uid int,
+incno int,
+calltype string,
+calldate string,
+watchdate string,
+reciveddate string,
+entrydate string,
+dispatchdate string,
+responsedtime string,
+on_scene_dtm string,
+transport_dtm string,
+hospital_dtm string,
+call_final_disposition string,
+available_dtm string,
+address string,
+city string,
+zipcode string,
+battalion string,
+station_area string,
+box int,
+o_priority string,
+priority string,
+f_priority int,
+als_unit string,
+call_type_group string,
+no_of_alarms int,
+unit_type string,
+ut_seq_call_dispatch int,
+fire_prev_district int,
+supervisior_district int,
+neighborhood_bound string,
+rowid string,
+case_location string,
+data_as_of string,
+data_loaded_at string,
+Analysis_neighbor int
+)
+Row format SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+with SERDEPROPERTIES(
+'separatorChar' =',',
+'quoteChar' = '"',
+'escapeChar' = '\\'
+)
+stored as textfile
+TBLPROPERTIES ('skip.header.line.count'='1');
+
+LOAD DATA LOCAL INPATH '/home/sunbeam/Desktop/Modules/BigData/data/Fire_Department_Calls_for_Service.csv' INTO TABLE fire_staging;
+
+create table fire_data(
+callno int,
+uid string,
+incno int,
+calltype string,
+calldate date,
+watchdate date,
+reciveddate timestamp,
+entrydate timestamp,
+dispatchdate timestamp,
+responsedtime timestamp,
+on_scene_dtm timestamp,
+transport_dtm timestamp,
+hospital_dtm timestamp,
+call_final_disposition string,
+available_dtm timestamp,
+address string,
+zipcode int,
+battalion string,
+station_area string,
+box int,
+o_priority string,
+priority string,
+f_priority int,
+als_unit string,
+call_type_group string,
+no_of_alarms int,
+unit_type string,
+ut_seq_call_dispatch int,
+fire_prev_district int,
+supervisior_district int,
+neighborhood_bound string,
+rowid string,
+case_location string,
+data_as_of string,
+data_loaded_at timestamp,
+Analysis_neighbor int
+)
+PARTITIONED BY (city string)
+CLUSTERED BY (callno) into 4 buckets
+stored as ORC
+TBLPROPERTIES ('transactional'='true');
+
+
+
+Insert into fire_data partition(city)
+select 
+callno,
+uid,
+incno,
+calltype,
+to_date(FROM_UNIXTIME(UNIX_TIMESTAMP(calldate,'MM/dd/yyyy'))) calldate,
+to_date(FROM_UNIXTIME(UNIX_TIMESTAMP(watchdate,'MM/dd/yyyy'))) watchdate,
+from_unixtime(unix_timestamp(reciveddate,'MM/dd/yyyy hh:mm:ss a')) as recieveddate,
+from_unixtime(unix_timestamp(entrydate,'MM/dd/yyyy hh:mm:ss a')) as entrydate,
+from_unixtime(unix_timestamp(dispatchdate,'MM/dd/yyyy hh:mm:ss a')) as dispatchdate,
+from_unixtime(unix_timestamp(responsedtime,'MM/dd/yyyy hh:mm:ss a')) as responsedtime,
+from_unixtime(unix_timestamp(on_scene_dtm,'MM/dd/yyyy hh:mm:ss a')) as on_scene_dtm,
+from_unixtime(unix_timestamp(transport_dtm,'MM/dd/yyyy hh:mm:ss a')) as transport_dtm,
+from_unixtime(unix_timestamp(hospital_dtm,'MM/dd/yyyy hh:mm:ss a')) as hospital_dtm,
+call_final_disposition,
+from_unixtime(unix_timestamp(available_dtm,'MM/dd/yyyy hh:mm:ss a')) as available_dtm,
+address,
+zipcode,
+battalion,
+station_area,
+box,
+o_priority,
+priority,
+f_priority,
+als_unit,
+call_type_group,
+no_of_alarms,
+unit_type,
+ut_seq_call_dispatch,
+fire_prev_district,
+supervisior_district,
+neighborhood_bound,
+rowid,case_location,
+data_as_of,
+from_unixtime(unix_timestamp(data_loaded_at,'MM/dd/yyyy hh:mm:ss a')) as data_loaded_at,
+Analysis_neighbor,
+city from fire_staging;
+
+
+2. Execute following queries on ﬁre dataset.
+1. How many distinct types of calls were made to the ﬁre department?
+
+select  count(distinct calltype) from fire_data;
++------+
+| _c0  |
++------+
+| 33   |
++------+
+
+
+2. What are distinct types of calls made to the ﬁre department?
+
+select distinct calltype from fire_data;
++-----------------------------------------------+
+|                   calltype                    |
++-----------------------------------------------+
+| Administrative                                |
+| Alarms                                        |
+| Electrical Hazard                             |
+| Elevator / Escalator Rescue                   |
+| Fuel Spill                                    |
+| Gas Leak (Natural and LP Gases)               |
+| High Angle Rescue                             |
+| Marine Fire                                   |
+| Mutual Aid / Assist Outside Agency            |
+| Odor (Strange / Unknown)                      |
+| Oil Spill                                     |
+| Other                                         |
+| Structure Fire / Smoke in Building            |
+| Vehicle Fire                                  |
+| Water Rescue                                  |
+| Aircraft Emergency                            |
+| Assist Police                                 |
+| Citizen Assist / Service Call                 |
+| Confined Space / Structure Collapse           |
+| Explosion                                     |
+| Extrication / Entrapped (Machinery, Vehicle)  |
+| HazMat                                        |
+| Industrial Accidents                          |
+| Lightning Strike (Investigation)              |
+| Medical Incident                              |
+| Outside Fire                                  |
+| Smoke Investigation (Outside)                 |
+| Structure Fire                                |
+| Suspicious Package                            |
+| Traffic Collision                             |
+| Train / Rail Fire                             |
+| Train / Rail Incident                         |
+| Watercraft in Distress                        |
++-----------------------------------------------+
+33 rows selected (275.609 seconds)
+
+3. Find out all responses for delayed times greater than 5 mins?
+
+select count( minute(responsedtime) - minute(reciveddate) ) 
+from fire_data
+where minute(responsedtime) - minute(reciveddate) > 5;
++---------+
+|   _c0   |
++---------+
+| 631414  |
++---------+
+
+
+4. What were the most common call types?
+
+select calltype, count(calltype) from fire_data
+group by calltype
+order by count(calltype) desc;
++-----------------------------------------------+----------+
+|                   calltype                    |   _c1    |
++-----------------------------------------------+----------+
+| Medical Incident                              | 4247943  |
+| Alarms                                        | 720968   |
+| Structure Fire                                | 714873   |
+| Traffic Collision                             | 259541   |
+| Other                                         | 110855   |
+| Citizen Assist / Service Call                 | 96222    |
+| Outside Fire                                  | 85967    |
+| Water Rescue                                  | 34061    |
+| Gas Leak (Natural and LP Gases)               | 30484    |
+| Vehicle Fire                                  | 28378    |
+| Electrical Hazard                             | 21907    |
+| Structure Fire / Smoke in Building            | 18894    |
+| Elevator / Escalator Rescue                   | 17952    |
+| Smoke Investigation (Outside)                 | 14613    |
+| Odor (Strange / Unknown)                      | 13673    |
+| Fuel Spill                                    | 7038     |
+| HazMat                                        | 4399     |
+| Industrial Accidents                          | 3333     |
+| Explosion                                     | 3067     |
+| Train / Rail Incident                         | 1715     |
+| Aircraft Emergency                            | 1512     |
+| Assist Police                                 | 1508     |
+| High Angle Rescue                             | 1456     |
+| Watercraft in Distress                        | 1237     |
+| Extrication / Entrapped (Machinery, Vehicle)  | 935      |
+| Confined Space / Structure Collapse           | 791      |
+| Mutual Aid / Assist Outside Agency            | 626      |
+| Oil Spill                                     | 518      |
+| Marine Fire                                   | 508      |
+| Suspicious Package                            | 368      |
+| Administrative                                | 345      |
+| Train / Rail Fire                             | 120      |
+| Lightning Strike (Investigation)              | 21       |
++-----------------------------------------------+----------+
+
+
+5. What zip codes accounted for the most common calls?
+
+select zipcode, calltype, count(calltype) from fire_data
+group by zipcode, calltype
+order by count(calltype) desc
+limit 20;
++----------+-------------------+---------+
+| zipcode  |     calltype      |   _c2   |
++----------+-------------------+---------+
+| 94102    | Medical Incident  | 616021  |
+| 94103    | Medical Incident  | 577576  |
+| 94109    | Medical Incident  | 372844  |
+| 94110    | Medical Incident  | 363740  |
+| 94124    | Medical Incident  | 218131  |
+| 94112    | Medical Incident  | 205392  |
+| 94115    | Medical Incident  | 175661  |
+| 94107    | Medical Incident  | 154910  |
+| 94122    | Medical Incident  | 152124  |
+| 94133    | Medical Incident  | 141632  |
+| 94117    | Medical Incident  | 130628  |
+| 94114    | Medical Incident  | 122120  |
+| 94134    | Medical Incident  | 120344  |
+| 94118    | Medical Incident  | 114410  |
+| 94121    | Medical Incident  | 107412  |
+| 94116    | Medical Incident  | 93966   |
+| 94132    | Medical Incident  | 93090   |
+| 94105    | Medical Incident  | 86657   |
+| 94102    | Alarms            | 83498   |
+| 94103    | Alarms            | 79941   |
++----------+-------------------+---------+
+
+
+6. What San Francisco neighborhoods are in the zip codes 94102 and 94103?
+
+select neighborhood_bound, zipcode, count(zipcode) 
+from fire_data
+where zipcode in (94102,94103) and city = "San Francisco"
+group by  zipcode, neighborhood_bound;
++---------------------------------+----------+---------+
+|       neighborhood_bound        | zipcode  |   _c2   |
++---------------------------------+----------+---------+
+| Financial District/South Beach  | 94102    | 7983    |
+| Hayes Valley                    | 94102    | 49220   |
+| Mission                         | 94102    | 1       |
+| Nob Hill                        | 94102    | 4995    |
+| South of Market                 | 94102    | 3092    |
+| Tenderloin                      | 94102    | 315208  |
+| Western Addition                | 94102    | 17016   |
+| Castro/Upper Market             | 94103    | 828     |
+| Financial District/South Beach  | 94103    | 17482   |
+| Hayes Valley                    | 94103    | 1207    |
+| Mission                         | 94103    | 100809  |
+| Mission Bay                     | 94103    | 3279    |
+| Potrero Hill                    | 94103    | 132     |
+| South of Market                 | 94103    | 269261  |
+| Tenderloin                      | 94103    | 5655    |
++---------------------------------+----------+---------+
+15 rows selected (27.767 seconds)
+
+7. What was the sum of all calls, average, min, and max of the call response times?
+select count(*) cnt,
+avg((unix_timestamp(responsedtime) - unix_timestamp(reciveddate))/60) avg,
+min((unix_timestamp(responsedtime) - unix_timestamp(reciveddate))/60) min,
+max((unix_timestamp(responsedtime) - unix_timestamp(reciveddate))/60) max
+from fire_data;
++----------+-------------------+---------------------+---------------------+
+|   cnt    |        avg        |         min         |         max         |
++----------+-------------------+---------------------+---------------------+
+| 6445828  | 4.00127744855805  | -713.4666666666667  | 2465.2833333333333  |
++----------+-------------------+---------------------+---------------------+
+
+
+8. How many distinct years of data are in the CSV ﬁle?
+
+select distinct year(calldate) from fire_data;
++-------+
+|  _c0  |
++-------+
+| 2000  |
+| 2002  |
+| 2004  |
+| 2006  |
+| 2008  |
+| 2010  |
+| 2012  |
+| 2014  |
+| 2016  |
+| 2018  |
+| 2020  |
+| 2022  |
+| 2001  |
+| 2003  |
+| 2005  |
+| 2007  |
+| 2009  |
+| 2011  |
+| 2013  |
+| 2015  |
+| 2017  |
+| 2019  |
+| 2021  |
+| 2023  |
++-------+
+
+
+9. What week of the year in 2018 had the most ﬁre calls?
+
+select weekofyear(calldate) week_of_year, count(*) cnt_call
+from fire_data
+where year(calldate) = 2018
+group by weekofyear(calldate)
+order by cnt_call
+limit 1;
++---------------+-----------+
+| week_of_year  | cnt_call  |
++---------------+-----------+
+| 33            | 5487      |
++---------------+-----------+
+
+10. What neighborhoods in San Francisco had the worst response time in 2018?
+
+select neighborhood_bound from fire_data 
+where city = "San Francisco" and year(calldate) = 2018
+order by (unix_timestamp(responsedtime) - unix_timestamp(reciveddate))/60 desc
+limit 1;
+
++---------------------+
+| neighborhood_bound  |
++---------------------+
+| West of Twin Peaks  |
++---------------------+
+

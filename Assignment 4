@@ -1,0 +1,253 @@
+1. Upload busstops.json data into HDFS directory. Then create hive external table to fetch data using JsonSerDe.
+    ```
+    {"_id":{"$oid":"5a0720b478597fc11004d951"},"stop":"Non-BRTS","code":"103B-D-04","seq":4.0,"stage":1.0,"name":"Aranyeshwar Corner","location":{"type":"Point","coordinates":[73.857675,18.486381]}}
+    ```
+    ``` 
+    location STRUCT<type:STRING, coordinates:ARRAY<DOUBLE>>
+    ```
+    ```
+    When column-name have special charatcters like _ or $, they should be encapsulated in `back-quotes`.
+    ```
+    
+hadoop fs -mkdir -p /user/$USER/busstops/input
+
+hadoop fs -put /home/sunbeam/Desktop/Modules/BigData/data/bus.json /user/$USER/busstops/input 
+
+hadoop fs -ls  /user/sunbeam/busstops/input
+
+create external table busstop_staging (
+`_id` STRUCT<`$oid`:STRING>,
+stop STRING,
+code STRING,
+seq FLOAT,
+stage FLOAT,
+name STRING,
+location STRUCT<type:STRING, coordinates:ARRAY<DOUBLE>>
+)
+ROW FORMAT SERDE 'org.apache.hive.hcatalog.data.JsonSerDe'
+STORED AS TEXTFILE
+LOCATION '/user/sunbeam/busstops/input';
+
+2. Execute following queries on MySQL emp database using Recursive CTEs (not supported in Hive 3.x).
+    1. Find years in range 1975 to 1985, where no emps were hired.
+    
+with recursive year as (
+select 1975 as yr
+union all
+select yr+1 from year where yr < 1985
+)
+select yr from year where yr not in 
+(select distinct year(hire) from emp);
++------+
+| yr   |
++------+
+| 1975 |
+| 1976 |
+| 1977 |
+| 1978 |
+| 1979 |
+| 1984 |
+| 1985 |
++------+
+
+    
+    2. Display emps with their level in emp hierarchy. Level employee is Level of his manager + 1.
+    
+with recursive emp_hierarchy as (
+ select empno,ename,job,mgr,sal,deptno,1 as level from emp
+ where mgr is null
+ union all
+ select e.empno,e.ename,e.job,e.mgr,e.sal,e.deptno,eh.level+1 from emp e
+ inner join emp_hierarchy eh on e.mgr = eh.empno
+)
+select * from emp_hierarchy order by level;
++-------+--------+-----------+------+---------+--------+-------+
+| empno | ename  | job       | mgr  | sal     | deptno | level |
++-------+--------+-----------+------+---------+--------+-------+
+|  7839 | KING   | PRESIDENT | NULL | 5000.00 |     10 |     1 |
+|  7566 | JONES  | MANAGER   | 7839 | 2975.00 |     20 |     2 |
+|  7698 | BLAKE  | MANAGER   | 7839 | 2850.00 |     30 |     2 |
+|  7782 | CLARK  | MANAGER   | 7839 | 2450.00 |     10 |     2 |
+|  7499 | ALLEN  | SALESMAN  | 7698 | 1600.00 |     30 |     3 |
+|  7521 | WARD   | SALESMAN  | 7698 | 1250.00 |     30 |     3 |
+|  7654 | MARTIN | SALESMAN  | 7698 | 1250.00 |     30 |     3 |
+|  7788 | SCOTT  | ANALYST   | 7566 | 3000.00 |     20 |     3 |
+|  7844 | TURNER | SALESMAN  | 7698 | 1500.00 |     30 |     3 |
+|  7900 | JAMES  | CLERK     | 7698 |  950.00 |     30 |     3 |
+|  7902 | FORD   | ANALYST   | 7566 | 3000.00 |     20 |     3 |
+|  7934 | MILLER | CLERK     | 7782 | 1300.00 |     10 |     3 |
+|  7369 | SMITH  | CLERK     | 7902 |  800.00 |     20 |     4 |
+|  7876 | ADAMS  | CLERK     | 7788 | 1100.00 |     20 |     4 |
++-------+--------+-----------+------+---------+--------+-------+
+
+    
+    3. Create a "newemp" table with foreign constraints enabled for "mgr" column. Also enable DELETE ON CASCADE for the same. Insert data into the table from emp table. Hint: You need to insert data levelwise to avoid FK constraint error.
+    
+ create table newemp (
+ empno int primary key,
+ ename varchar(20),
+ job varchar(20),
+ mgr int,
+ hire date,
+ sal decimal(10,2),
+ comm decimal(10,2),
+ deptno int,
+ constraint fk_manager foreign key (mgr) references newemp (empno)
+ on delete cascade
+ );
+ 
+ insert into newemp
+ (empno, ename, job, mgr, hire, sal, comm, deptno)
+ select e.empno,e.ename, e.job, e.mgr, e.hire, e.sal, e.comm, e.deptno
+ from emp e where e.mgr in (select empno from newemp);
+    
+    4. From "newemp" table, delete employee KING. What is result?
+    
+delete from newemp where ename = "KING";
+mysql> select * from newemp;
+Empty set (0.00 sec)
+
+
+3. Load Fire data into Hive in a staging table "fire_staging".
+
+CREATE TABLE fire_staging (
+call_no INT,
+unit_id STRING,
+incident_no INT,
+call_type STRING,
+call_date STRING,
+watch_date STRING,
+received_DtTm STRING,
+entry_DtTm STRING,
+dispatch_DtTm STRING,
+response_DtTm STRING,
+on_scence_DtTm STRING,
+Transport_DtTm STRING,
+hospital_DtTm STRING,
+call_final_disposition STRING,
+available_DtTm STRING,
+addr STRING,
+city STRING,
+zipc_incident INT,
+battalion STRING,
+station_area STRING,
+box INT,
+original_priority STRING,
+priority STRING,
+final_priority SMALLINT,
+als_unit STRING,
+call_type_gr STRING,
+no_of_alarms SMALLINT,
+unit_type STRING,
+unit_seq_call_dispatch SMALLINT,
+fire_prev_dist SMALLINT,
+supervisor_dist SMALLINT,
+neighborhoods_analysis_boundries STRING,
+row_id STRING,
+case_loc STRING,
+data_as_of STRING,
+data_loaded_at STRING,
+analysis_neigh SMALLINT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+TBLPROPERTIES ('skip.header.line.count' = '1');
+
+load data local inpath'/home/sunbeam/Desktop/Modules/BigData/data/Fire_Department_Calls_for_Service.csv' into table fire_staging;
+
+
+4. Implement Movie recommendation system.
+    * Example Input Data
+        ```
+        userId,movieId,rating,rtime
+        17,70,3,0
+        35,21,1,0
+        49,19,2,0
+        49,21,1,0
+        49,70,4,0
+        87,19,1,0
+        87,21,2,0
+        98,19,2,0
+        ```
+    * Create pairs of movies rated by same user.
+        ```
+        userId,movie1,rating1,movie2,rating2
+        49,21,1.0,70,4.0
+        49,19,2.0,21,1.0
+        49,19,2.0,70,4.0
+        87,19,1.0,21,2.0
+        ```
+    * Create correlation table.
+        ```
+        movie1,movie2,cnt,cor
+        19,21,2,-1.0
+        19,70,1,0.0
+        21,70,1,0.0
+        ```
+    * Predict Similar movies for given movie Id. Get the recommended movies titles from movies table.
+    * Hints
+        * Start with above small data tables to test accuracy of the steps.
+        * You will need to create new intermediate tables to store results of earlier queries.
+        * For main data use ORC format to speed-up the queries.
+        * You may need to change reducer tasks memory for quicker execution and avoid OutOfMemory errors.
+            * SET mapreduce.reduce.memory.mb = 4096;
+            * SET mapreduce.reduce.java.opts = -Xmx4096m;
+    * Input movie id in Python/Java application and show related 5 movies.
+    
+create table ratings (uid int,mid int,rating double,rtime timestamp)
+stored as orc
+tblproperties('transactional'='true');
+
+insert into ratings
+select uid,mid,rating,from_unixtime(rtime) from rating_staging;
+
+create view user_movies as 
+select rt1.uid, rt1.mid m1, rt1.rating r1, rt2.mid m2, rt2.rating r2 
+from ratings rt1  inner join ratings rt2
+on rt1.uid = rt2.uid
+where rt1.mid < rt2.mid;
+
+create materialized view corr_movies as 
+select m1, m2, count(m1) cnt, corr(r1,r2) cor from user_movies
+group by m1,m2
+having corr(r1,r2) is not null;
+
+from pyhive import hive
+
+# hive config
+host_name = 'localhost'
+port = 10000
+user = 'sunbeam'
+password = ' '
+db_name = 'edbda'
+
+# get hive connection
+conn = hive.Connection(host=host_name, port=port, username=user, password=password, database=db_name, auth='CUSTOM')
+
+# get the cursor object
+cur = conn.cursor()
+
+# execute the sql query using cursor
+mid = int(input('Enter movie id: '))
+sql = """
+WITH movie_recom AS (
+SELECT 
+IF(m1= %s, m2, m1) movieid 
+FROM corr_movies c 
+WHERE cor > 0.6 AND cnt > 10 AND (m1 = %s or m2 = %s))
+SELECT mr.movieid, ms.title 
+FROM movie_recom mr 
+INNER JOIN movie_staging ms ON mr.movieid = ms.movieid
+"""
+
+cur.execute(sql, [mid, mid, mid])
+
+# collect/process result
+result = cur.fetchall()
+for row in result:
+    print(row)
+
+# close the connection
+conn.close()
+

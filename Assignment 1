@@ -1,0 +1,141 @@
+A. Retrieve the names of all customers who made a purchase.
+select c.name from customers c
+inner join sales s on s.customerid = c.customerid
+
++----------------+
+|     c.name     |
++----------------+
+| John Doe       |
+| Jane Smith     |
+| Bob Johnson    |
+| Alice Brown    |
+| Charlie Davis  |
++----------------+
+
+
+B. List the products and their total sales amounts for a given date range.
+
+select productid, saledate, sum(totalamount) from sales
+group by saledate,productid;
++------------+-------------+----------+
+| productid  |  saledate   |   _c2    |
++------------+-------------+----------+
+| 1          | 2023-01-01  | 1600.00  |
+| 2          | 2023-01-03  | 400.00   |
+| 3          | 2023-01-02  | 60.00    |
+| 4          | 2023-02-01  | 100.00   |
+| 5          | 2023-02-02  | 150.00   |
++------------+-------------+----------+
+
+
+C. Find the total sales amount for each product category.
+
+select p.category, sum(totalamount) from products p
+inner join sales s on s.productid = p.productid
+group by p.category;
++--------------+----------+
+|  p.category  |   _c1    |
++--------------+----------+
+| Clothing     | 60.00    |
+| Electronics  | 2000.00  |
+| Footwear     | 100.00   |
+| Furniture    | 150.00   |
++--------------+----------+
+
+
+D. Identify the customers who made purchases in a speciﬁc city.
+
+select name, city from customers c
+inner join locations l on l.locationid = c.locationid;
++----------------+------------+
+|      name      |    city    |
++----------------+------------+
+| John Doe       | Pune       |
+| Bob Johnson    | Pune       |
+| Jane Smith     | Mumbai     |
+| Charlie Davis  | Mumbai     |
+| Alice Brown    | Bangalore  |
++----------------+------------+
+
+
+E. Calculate the average age of customers who bought products in the 'Electronics' category.
+
+select category, avg(age) from customers c
+inner join sales s on s.customerid = c.customerid
+inner join products p on p.productid = s.productid
+where category = 'Electronics'
+group by category;
++--------------+-------+
+|   category   |  _c1  |
++--------------+-------+
+| Electronics  | 32.5  |
++--------------+-------+
+
+
+F. List the top 3 products based on total sales amount.
+
+select productname, totalamount from products p
+inner join sales s on s.productid = p.productid
+order by totalamount desc
+limit 3;
++--------------+--------------+
+| productname  | totalamount  |
++--------------+--------------+
+| Laptop       | 1600.00      |
+| Smartphone   | 400.00       |
+| Bookshelf    | 150.00       |
++--------------+--------------+
+
+
+G. Find the total sales amount for each month.
+
+select month(saledate), sum(totalamount) from sales
+group by month(saledate);
++------+----------+
+| _c0  |   _c1    |
++------+----------+
+| 1    | 2060.00  |
+| 2    | 250.00   |
++------+----------+
+
+
+H. Identify the products with no sales.
+
+select productname, totalamount from products p
+inner join sales s on s.productid = p.productid
+where totalamount is null;
++--------------+--------------+
+| productname  | totalamount  |
++--------------+--------------+
++--------------+--------------+
+No rows selected (18.062 seconds)
+
+
+I. Calculate the total sales amount for each state.
+
+select state, sum(totalamount) from locations l
+inner join customers c on c.locationid = l.locationid
+inner join sales s on s.customerid = c.customerid
+group by state;
+
++--------------+----------+
+|    state     |   _c1    |
++--------------+----------+
+| Karnataka    | 100.00   |
+| Maharashtra  | 2210.00  |
++--------------+----------+
+
+J. Retrieve the customer names and their highest purchase amount.
+
+select name, totalamount from customers c
+inner join sales s on s.customerid = c.customerid;
++----------------+--------------+
+|      name      | totalamount  |
++----------------+--------------+
+| John Doe       | 1600.00      |
+| Jane Smith     | 60.00        |
+| Bob Johnson    | 400.00       |
+| Alice Brown    | 100.00       |
+| Charlie Davis  | 150.00       |
++----------------+--------------+
+
